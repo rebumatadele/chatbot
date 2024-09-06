@@ -14,7 +14,7 @@ export const SearchVector = async (text: any) => {
     // Query Pinecone index using the vector
     const queryResponse = await index.namespace("book").query({
         vector: vector,
-        topK: 1, // Get the top match
+        topK: 10, // Get the top match
         includeValues: true,
         includeMetadata: true, // Include metadata in the response
     });
