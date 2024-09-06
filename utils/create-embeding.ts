@@ -1,35 +1,47 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
-import dotenv from "dotenv";
-// Initialize LangChain's OpenAI embedding model
-dotenv.config();
+
 
 // Initialize LangChain's OpenAI embedding model
-const embeddingModel = new OpenAIEmbeddings(
-  { openAIApiKey: process.env.OPENAI_API_KEY }
-);
+const embeddingModel = new OpenAIEmbeddings({
+  openAIApiKey: "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",
+});
 
-// Function to process embeddings and log them
-export const processEmbeddings = async (chunks: { content: string, metadata: any }[]) => {
+// Function to process embeddings with user metadata
+export const processEmbeddings = async (
+  userId: string,
+  chunks: { content: string; metadata: any }[]
+) => {
   try {
-    let i = 1
+    let i = 1;
+    const embeddings = [];
     for (const chunk of chunks) {
       // Generate embeddings for the chunk using LangChain
       const [embedding] = await embeddingModel.embedDocuments([chunk.content]);
-      
-      // Log the embedding and its size
+
+      // Push embedding with metadata for storing
+      embeddings.push({
+        id: `user-${userId}-chunk-${i}`, // Unique ID for each chunk
+        values: embedding,
+        metadata: { ...chunk.metadata, userId, text: chunk.content }, // Include original text
+      });
+
       console.log(`Embedding for chunk: ${i} :`, chunk.content);
       console.log(`Embedding vector (size: ${embedding.length}):`, embedding);
-      i += 1
+      i += 1;
     }
-    console.log("Done Vectorization")
+
+    console.log("Done Vectorization");
+    return embeddings;
   } catch (error) {
     console.error("Error processing embeddings:", error);
+    throw error;
   }
 };
 
-// Embedding Query
-export const embedQuery = async (query: {content: string, metadata:any}) => {
+// Embedding Query (for future use)
+export const embedQuery = async (query: { content: string; metadata: any }) => {
   const res = await embeddingModel.embedQuery(query.content);
-  console.log(`Embedding for chunk:`, query.content);
-  console.log(`Embedding for chunk:`, res);
-}
+  console.log(`Embedding for query:`, query.content);
+  console.log(`Embedding result:`, res);
+  return res;
+};

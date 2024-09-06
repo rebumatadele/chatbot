@@ -1,43 +1,33 @@
-"use client"
-import React, { useState } from 'react';
-import { processFile } from '@/utils/create-chunk'; // Adjust the path as needed
-
-const ChatRoom: React.FC = () => {
-  const [query, setQuery] = useState('');
-  const [response, setResponse] = useState('');
+"use client";
+import React, { useState } from "react";
+import { processFile } from "@/utils/create-chunk";
+import { SearchVector } from "@/utils/search-vector";
+const ChatRoom = () => {
+  const [query, setQuery] = useState("");
+  const [response, setResponse] = useState<any>();
   const [file, setFile] = useState<File | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-
-      // Use FileReader to read the file content
-      const reader = new FileReader();
-
-      // When the file is fully loaded, process it
-      reader.onload = (event) => {
-        const fileContent = event.target?.result;
-        if (fileContent && selectedFile) {
-          // File is fully loaded, process it
-          console.log("File fully loaded, processing...");
-          processFile(selectedFile);  // You can modify this to pass the content if needed
-        }
-      };
-
-      // Read the file as text or as data URL, depending on the file type
-      reader.readAsText(selectedFile);  // or reader.readAsDataURL(selectedFile);
+      // Create a FormData object to send the file
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      processFile(formData)
     }
   };
+
   const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const mockResponse = `Response to: ${query}`;
+    const mockResponse = await SearchVector(query)
+    console.log(mockResponse)
     setResponse(mockResponse);
-    setQuery('');
+    setQuery("");
     setFile(null);
   };
 
