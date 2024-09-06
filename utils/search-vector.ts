@@ -1,10 +1,11 @@
 "use server"
 import { Pinecone } from '@pinecone-database/pinecone'
-import { embedQuery } from './create-embeding';
+import { embedQuery } from './gemini-embedding';
 
 // Initialize Pinecone client
-const pc = new Pinecone({ apiKey : ""})
-const index = pc.index("user-embeddings-index")
+const api_key = process.env.PINECONE_API_KEY || ""
+const pc = new Pinecone({ apiKey : api_key })
+const index = pc.index("gemini-user-embeddings-index")
 // Function to search for the nearest vector match and retrieve the document
 export const SearchVector = async (text: any) => {
     // Get the embedding (vector) for the input text
@@ -13,7 +14,7 @@ export const SearchVector = async (text: any) => {
     // Query Pinecone index using the vector
     const queryResponse = await index.namespace("book").query({
         vector: vector,
-        topK: 3, // Get the top match
+        topK: 10, // Get the top match
         includeValues: true,
         includeMetadata: true, // Include metadata in the response
     });

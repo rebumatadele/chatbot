@@ -9,9 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.2",
+    "@langchain/anthropic": "^0.2.16",
+    "@langchain/google-genai": "^0.0.26",
     "@langchain/openai": "^0.2.10",
-    "@next/env": "^14.2.8",
     "@pinecone-database/pinecone": "^3.0.2",
+    "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "next": "14.2.5",
     "openai": "^4.57.3",

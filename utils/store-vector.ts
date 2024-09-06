@@ -1,13 +1,15 @@
 import { Pinecone } from "@pinecone-database/pinecone";
-import { processEmbeddings } from "./create-embeding"; // Import the embedding function
+// import { processEmbeddings } from "./create-embeding"; // Import the embedding function
+import { processEmbeddings } from "./gemini-embedding"; // Import the embedding function
 
 // Initialize Pinecone client
+const api_key = process.env.PINECONE_API_KEY || ""
 const pc = new Pinecone({
-    apiKey: '55304c21-e607-44c2-a788-abc8438a5010'
+    apiKey: api_key
   });
 
 // Define the index name where you want to store the vectors
-const indexName = "user-embeddings-index";
+const indexName = "gemini-user-embeddings-index";
 
 // Function to store user-specific vectors
 export const storeUserVectors = async (
@@ -22,7 +24,7 @@ export const storeUserVectors = async (
     const indexList = await pc.listIndexes();
     const indexNames = indexList?.indexes?.map((index) => index.name) || [];
     if(!indexNames.includes(indexName)){
-        CreateIndex("user-embeddings-index")
+        CreateIndex("gemini-user-embeddings-index")
     }
     // Upsert (insert or update) the embeddings into the index
     const index = pc.index(indexName);
@@ -39,7 +41,8 @@ const CreateIndex = async (indexName: string) => {
  // Create an index (if not already created)
     await pc.createIndex({
         name: indexName,
-        dimension: 1536, // Replace with your model dimensions
+        // dimension: 1536, // Replace with your model dimensions
+        dimension: 768,
         metric: 'cosine', // Replace with your model metric
         spec: { 
         serverless: { 
