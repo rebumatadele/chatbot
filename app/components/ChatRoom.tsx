@@ -26,7 +26,9 @@ const ChatRoom = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const mockResponse = await SearchVector(query)
-    setResponse(generateWithAnthropic(query + "use the following as a context and respond in 2 sentence" + mockResponse));
+    const response = await generateWithAnthropic(query + "use the following as a context and respond in 2 sentence" + mockResponse)
+    console.log("Response", response)
+    setResponse(response);
     setQuery("");
     setFile(null);
   };
