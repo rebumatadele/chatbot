@@ -3,7 +3,7 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 
 // Initialize LangChain's OpenAI embedding model
 const embeddingModel = new OpenAIEmbeddings({
-  openAIApiKey: "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",
+  openAIApiKey: process.env.OPENAI_API_KEY,
 });
 
 // Function to process embeddings with user metadata

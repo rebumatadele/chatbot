@@ -3,7 +3,7 @@ import { Pinecone } from '@pinecone-database/pinecone'
 import { embedQuery } from './create-embeding';
 
 // Initialize Pinecone client
-const pc = new Pinecone({ apiKey: "55304c21-e607-44c2-a788-abc8438a5010" })
+const pc = new Pinecone({ apiKey : ""})
 const index = pc.index("user-embeddings-index")
 // Function to search for the nearest vector match and retrieve the document
 export const SearchVector = async (text: any) => {
