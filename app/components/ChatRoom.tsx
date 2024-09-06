@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { processFile } from "@/utils/create-chunk";
 import { SearchVector } from "@/utils/search-vector";
+import { generateWithAnthropic } from "@/utils/claude/integrate";
 const ChatRoom = () => {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<any>();
@@ -25,8 +26,7 @@ const ChatRoom = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const mockResponse = await SearchVector(query)
-    console.log(mockResponse)
-    setResponse(mockResponse);
+    setResponse(generateWithAnthropic(query + "use the following as a context and respond in 2 sentence" + mockResponse));
     setQuery("");
     setFile(null);
   };

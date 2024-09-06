@@ -3,7 +3,7 @@ import { Pinecone } from '@pinecone-database/pinecone'
 import { embedQuery } from './create-embeding';
 
 // Initialize Pinecone client
-const pc = new Pinecone({ apiKey : ""})
+const pc = new Pinecone({ apiKey : "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"})
 const index = pc.index("user-embeddings-index")
 // Function to search for the nearest vector match and retrieve the document
 export const SearchVector = async (text: any) => {
@@ -13,7 +13,7 @@ export const SearchVector = async (text: any) => {
     // Query Pinecone index using the vector
     const queryResponse = await index.namespace("book").query({
         vector: vector,
-        topK: 3, // Get the top match
+        topK: 10, // Get the top match
         includeValues: true,
         includeMetadata: true, // Include metadata in the response
     });
