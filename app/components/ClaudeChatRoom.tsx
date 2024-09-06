@@ -43,7 +43,7 @@ export default function ClaudeChat() {
       setInputMessage('')
       setIsLoading(true)
       
-      const mockResponse = await SearchVector(newMessage.text);
+      const mockResponse = await SearchVector(inputMessage);
       const response = await generateWithAnthropic(newMessage + "use the following as a context and respond in 2 sentence" + mockResponse)
 
 

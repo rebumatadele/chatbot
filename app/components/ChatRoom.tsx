@@ -4,7 +4,7 @@ import { processFile } from "@/utils/create-chunk";
 import { SearchVector } from "@/utils/search-vector";
 import { generateWithAnthropic } from "@/utils/claude/integrate";
 
-const ChatRoom = () => {
+const ChatRoom: React.FC = () => {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<any>();
   const [file, setFile] = useState<File | null>(null);

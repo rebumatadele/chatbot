@@ -4,7 +4,7 @@ import ClaudeChatRoom from "./components/ClaudeChatRoom";
 export default function Home() {
   return (
     <>
-      <ClaudeChatRoom></ClaudeChatRoom>
+      <ChatRoom></ChatRoom>
     </>
   );
 }
