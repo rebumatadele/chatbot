@@ -1,5 +1,4 @@
-"use server"
-import axios, { AxiosError } from 'axios';
+"use server";
 
 const apiKey = process.env.ANTHROPIC_API_KEY; // API key stored in environment variables
 
@@ -14,45 +13,40 @@ export async function generateWithAnthropic(prompt: string): Promise<string | nu
     return null;
   }
 
-  const headers = {
-    'x-api-key': apiKey,
-    'content-type': 'application/json',
-    'anthropic-version': '2023-06-01',
-  };
-
-  const data = {
-    model: 'claude-3-5-sonnet-20240620',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 1024,
-  };
-
   try {
-    const response = await axios.post<AnthropicResponse>(
-      'https://api.anthropic.com/v1/messages',
-      data,
-      { headers, timeout: 30000 }
-    );
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20240620',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1024,
+      }),
+    });
 
-    if (response.status >= 200 && response.status < 300) {
-      if (response.data.content && Array.isArray(response.data.content)) {
-        return response.data.content.map(item => item.text || '').join('');
+    console.log("Response Status:", response.status);
+
+    if (response.ok) { // Check if status is in the range 200-299
+      const data: AnthropicResponse = await response.json();
+      if (data.content && Array.isArray(data.content)) {
+        return data.content.map(item => item.text || '').join('');
       } else {
-        console.error('No content field in the Anthropic API response:', response.data);
+        console.error('No content field in the Anthropic API response:', data);
         return null;
       }
     } else {
-      const errorMessage = `Anthropic API Error: ${response.status} - ${response.data.error?.message || 'Unknown error'}`;
+      const errorText = await response.text();
+      const errorMessage = `Anthropic API Error: ${response.status} - ${errorText || 'Unknown error'}`;
       console.error(errorMessage);
       return null;
     }
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError;
-      const errorMessage = `An error occurred while calling the Anthropic API: ${axiosError.message}`;
-      console.error(errorMessage);
-    } else {
-      console.error('An unexpected error occurred:', error);
-    }
+    console.error('An unexpected error occurred:', error);
     return null;
   }
 }
