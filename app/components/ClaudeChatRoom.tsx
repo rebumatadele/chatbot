@@ -44,8 +44,9 @@ export default function ClaudeChat() {
       setIsLoading(true)
       
       const mockResponse = await SearchVector(inputMessage);
+      console.log(mockResponse)
       const response = await generateWithAnthropic(newMessage + "use the following as a context and respond in 2 sentence" + mockResponse)
-
+      console.log(response)
 
       // Simulate AI response
       setTimeout(() => {
