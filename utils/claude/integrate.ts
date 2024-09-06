@@ -1,5 +1,5 @@
 "use server"
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 const apiKey = process.env.ANTHROPIC_API_KEY; // API key stored in environment variables
 
@@ -9,6 +9,11 @@ interface AnthropicResponse {
 }
 
 export async function generateWithAnthropic(prompt: string): Promise<string | null> {
+  if (!apiKey) {
+    console.error('ANTHROPIC_API_KEY is not set in the environment variables.');
+    return null;
+  }
+
   const headers = {
     'x-api-key': apiKey,
     'content-type': 'application/json',
@@ -28,22 +33,26 @@ export async function generateWithAnthropic(prompt: string): Promise<string | nu
       { headers, timeout: 30000 }
     );
 
-    if (response.status === 200) {
-      const responseData = response.data;
-
-      if (responseData.content && Array.isArray(responseData.content)) {
-        return responseData.content.map(item => item.text || '').join('');
+    if (response.status >= 200 && response.status < 300) {
+      if (response.data.content && Array.isArray(response.data.content)) {
+        return response.data.content.map(item => item.text || '').join('');
       } else {
-        return 'No content field in response';
+        console.error('No content field in the Anthropic API response:', response.data);
+        return null;
       }
     } else {
-      const errorMessage = `Anthropic Error: ${response.status} - ${response.data.error?.message || 'Unknown error'}`;
+      const errorMessage = `Anthropic API Error: ${response.status} - ${response.data.error?.message || 'Unknown error'}`;
       console.error(errorMessage);
       return null;
     }
   } catch (error) {
-    const errorMessage = `An error occurred: ${(error as Error).message}`;
-    console.error(errorMessage);
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      const errorMessage = `An error occurred while calling the Anthropic API: ${axiosError.message}`;
+      console.error(errorMessage);
+    } else {
+      console.error('An unexpected error occurred:', error);
+    }
     return null;
   }
 }
