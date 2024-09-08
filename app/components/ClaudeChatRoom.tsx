@@ -18,8 +18,9 @@ import {
 } from "lucide-react";
 import { processFile } from "@/utils/preprocess/create-chunk";
 import { SearchVector } from "@/utils/vector/pinecone/search-vector";
-import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 import { generateWithGoogle } from "@/utils/providers/google/integrate";
+import Context from "@/utils/prompt-engineering/context-chain";
+import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 
 interface Message {
   id: string;
@@ -41,14 +42,17 @@ export default function ClaudeChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  async function Session() {
+  const fetchSession = async () => {
     const session = await getSession();
-    return session?.user?.email;
-  }
+    return session?.user?.email || "";
+  };
+
   useEffect(scrollToBottom, [messages]);
 
   const handleSendMessage = async () => {
     if (inputMessage.trim()) {
+      setIsLoading(true);
+
       const newMessage: Message = {
         id: Date.now().toString(),
         text: inputMessage,
@@ -56,27 +60,37 @@ export default function ClaudeChat() {
       };
       setMessages((prev) => [...prev, newMessage]);
       setInputMessage("");
-      setIsLoading(true);
 
-      const mockResponse = await SearchVector(await Session() || "", inputMessage);
-      console.log(mockResponse);
+      const userSession = await fetchSession();
+      const query = await Context(inputMessage, userSession);
 
-      const response = await generateWithGoogle(
-        `Given a context, summarize the user's query as a human readable response with no markdown and solely based of of the context. Return ONLY this paraphrase. context = ${mockResponse}, query = ${inputMessage}`
-      );
-      console.log(response);
-      // const response = await generateWithGoogle("Hello, explain what google is")
+      try {
+        const context = await SearchVector(
+          userSession,
+          inputMessage + " : " + query,
+          "context-index",
+          5
+        );
 
-      // Simulate AI response
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: response?.toString() || "",
-          isUser: false,
-        };
-        setMessages((prev) => [...prev, aiResponse]);
+        const response = await generateWithGoogle(
+          `Given the context below, answer the user query in concise and, human-readable format. The summary should be based entirely on the context provided. Do not return any additional information or markdown. 
+           Context: ${context}, 
+           User Query: ${query}`
+        );
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            text: response?.toString() || "",
+            isUser: false,
+          },
+        ]);
+      } catch (error) {
+        console.error("Error fetching response:", error);
+      } finally {
         setIsLoading(false);
-      }, 2000);
+      }
     }
   };
 
@@ -85,28 +99,17 @@ export default function ClaudeChat() {
       setIsUploading(true);
       const selectedFile = e.target.files[0];
       setFiles(selectedFile);
-      // Create a FormData object to send the file
       const formData = new FormData();
       formData.append("file", selectedFile);
-      await processFile(await Session() || "", formData);
-      setIsUploading(false);
 
-      //   const newFiles = Array.from(e.target.files)
-
-      //   // Simulate file upload delay
-      //   await new Promise(resolve => setTimeout(resolve, 1500))
-
-      //   setFiles(prev => [...prev, ...newFiles])
-      //   setIsUploading(false)
+      try {
+        await processFile(await fetchSession(), formData);
+      } catch (error) {
+        console.error("File processing error:", error);
+      } finally {
+        setIsUploading(false);
+      }
     }
-  };
-
-  const removeFile = (index: number) => {
-    // setFiles(prev => {
-    //   const newFiles = [...prev]
-    //   newFiles.splice(index, 1)
-    //   return newFiles
-    // })
   };
 
   return (
@@ -162,13 +165,13 @@ export default function ClaudeChat() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            multiple
             className="hidden"
           />
           <Button
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
+            aria-label="Upload Files"
           >
             {isUploading ? (
               <>
@@ -183,19 +186,16 @@ export default function ClaudeChat() {
             )}
           </Button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-          <div className="flex items-center justify-between bg-background p-2 rounded">
-            <span className="truncate text-sm">{files?.name}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => removeFile(0)}
-              className="h-6 w-6"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+        {files && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            <div className="flex items-center justify-between bg-background p-2 rounded">
+              <span className="truncate text-sm">{files.name}</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Remove File">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="flex items-end space-x-2 p-4 bg-background border-t">
@@ -217,6 +217,7 @@ export default function ClaudeChat() {
           size="icon"
           className="rounded-full h-10 w-10"
           disabled={isLoading}
+          aria-label="Send Message"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -224,6 +225,24 @@ export default function ClaudeChat() {
             <ArrowUp className="h-4 w-4" />
           )}
         </Button>
+
+        <Button
+          onClick={()=>{
+            DeleteIndex("context-index")
+            DeleteIndex("query-index")
+          }}
+          size="icon"
+          className="rounded-full h-10 w-10"
+          disabled={isLoading}
+          aria-label="Send Message"
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            "X"
+          )}
+        </Button>
+
       </div>
 
       <footer className="p-2 bg-background border-t text-center text-sm text-muted-foreground">

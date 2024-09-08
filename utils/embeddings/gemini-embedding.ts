@@ -24,7 +24,7 @@ export const processEmbeddings = async (
   
         // Push embedding with metadata for storing
         embeddings.push({
-          id: `user-${email}-chunk-${i}`, // Unique ID for each chunk
+          id: `user-${email}-chunk-${i}-${Math.random()}`, // Unique ID for each chunk
           values: embedding,
           metadata: { ...chunk.metadata, email, text: chunk.content }, // Include original text
         });

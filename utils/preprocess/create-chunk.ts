@@ -23,7 +23,7 @@ export const processFile = async (email: string, formData: FormData) => {
             console.log("Chunks:", chunks);
 
             // Process the chunks to generate embeddings and store in Pinecone
-            await storeUserVectors(email, chunks);
+            await storeUserVectors(email, chunks, "context-index");
         } else {
             console.warn("File content is empty or undefined.");
         }
