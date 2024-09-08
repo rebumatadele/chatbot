@@ -16,11 +16,14 @@ import {
   X,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
+
 import { processFile } from "@/utils/preprocess/create-chunk";
 import { SearchVector } from "@/utils/vector/pinecone/search-vector";
 import { generateWithGoogle } from "@/utils/providers/google/integrate";
 import Context from "@/utils/prompt-engineering/context-chain";
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
+import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 
 interface Message {
   id: string;
@@ -65,24 +68,34 @@ export default function ClaudeChat() {
       const query = await Context(inputMessage, userSession);
 
       try {
-        const context = await SearchVector(
+        let context;
+        context = await SearchVector(
           userSession,
           inputMessage + " : " + query,
           "context-index",
           5
         );
-
-        const response = await generateWithGoogle(
-          `Given the context below, answer the user query in concise and, human-readable format. The summary should be based entirely on the context provided. Do not return any additional information or markdown. 
-           Context: ${context}, 
-           User Query: ${query}`
-        );
+        console.log("Icarus" , context)
+        let response
+        if(context){
+          response = await generateWithAnthropic(
+            `Given the context below, answer the user query in concise and, human-readable format. The summary should be based solely on the context provided. Do not return any additional information or markdown. 
+             Context: ${context}, 
+             User Query: ${query}`
+          );
+        }
+        else{
+          response = await generateWithAnthropic(
+          `Based on your general knowledge base, answer the user query in concise and, human-readable format. The summary should be explanatory. Do not return any additional information or markdown. 
+             User Query: ${query}`
+          );
+        }
 
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
-            text: response?.toString() || "",
+            text: query + " : " + response?.toString() || "",
             isUser: false,
           },
         ]);
@@ -190,7 +203,12 @@ export default function ClaudeChat() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             <div className="flex items-center justify-between bg-background p-2 rounded">
               <span className="truncate text-sm">{files.name}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Remove File">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                aria-label="Remove File"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -227,22 +245,19 @@ export default function ClaudeChat() {
         </Button>
 
         <Button
-          onClick={()=>{
-            DeleteIndex("context-index")
-            DeleteIndex("query-index")
+          onClick={() => {
+            DeleteIndex("context-index");
+            DeleteIndex("query-index");
+            setMessages([]);
+            toast("Context cleared Successfully");
           }}
           size="icon"
           className="rounded-full h-10 w-10"
           disabled={isLoading}
           aria-label="Send Message"
         >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            "X"
-          )}
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "X"}
         </Button>
-
       </div>
 
       <footer className="p-2 bg-background border-t text-center text-sm text-muted-foreground">

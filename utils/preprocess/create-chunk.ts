@@ -32,13 +32,23 @@ export const processFile = async (email: string, formData: FormData) => {
     }
 };
 
-// Helper function to split the text into chunks
+// Helper function to split the text into chunks with period search
 const splitTextIntoChunks = (text: string, chunkSize: number, source: string) => {
     const chunks = [];
     let startIndex = 0;
 
     while (startIndex < text.length) {
-        const chunk = text.slice(startIndex, startIndex + chunkSize);
+        let endIndex = startIndex + chunkSize;
+
+        // Look for a period within the next 50 characters after the chunk
+        const periodIndex = text.slice(endIndex, endIndex + 50).indexOf('.');
+
+        // If a period is found, adjust the endIndex to include it
+        if (periodIndex !== -1) {
+            endIndex += periodIndex + 1; // Include the period
+        }
+
+        const chunk = text.slice(startIndex, endIndex);
         const chunkData = {
             content: chunk,
             metadata: {
@@ -47,8 +57,11 @@ const splitTextIntoChunks = (text: string, chunkSize: number, source: string) =>
             },
         };
         chunks.push(chunkData);
-        startIndex += chunkSize;
+
+        // Update the startIndex for the next chunk
+        startIndex = endIndex;
     }
 
     return chunks;
 };
+

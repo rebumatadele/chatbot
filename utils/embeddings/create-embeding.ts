@@ -1,3 +1,4 @@
+"use server"
 import { OpenAIEmbeddings } from "@langchain/openai";
 
 // Initialize LangChain's OpenAI embedding model
