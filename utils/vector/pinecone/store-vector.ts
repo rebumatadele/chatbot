@@ -1,6 +1,6 @@
 import { Pinecone } from "@pinecone-database/pinecone";
 // import { processEmbeddings } from "./create-embeding"; // Import the embedding function
-import { processEmbeddings } from "./gemini-embedding"; // Import the embedding function
+import { processEmbeddings } from "../../embeddings/gemini-embedding"; // Import the embedding function
 
 // Initialize Pinecone client
 const api_key = process.env.PINECONE_API_KEY || ""
@@ -9,28 +9,28 @@ const pc = new Pinecone({
   });
 
 // Define the index name where you want to store the vectors
-const indexName = "gemini-user-embeddings-index";
+const indexName = "context-index";
 
 // Function to store user-specific vectors
 export const storeUserVectors = async (
-  userId: string,
+  email: string,
   chunks: { content: string; metadata: any }[]
 ) => {
   try {
     // Generate embeddings for the chunks
-    const embeddings = await processEmbeddings(userId, chunks);
+    const embeddings = await processEmbeddings(email, chunks);
 
     // get a list of indexes
     const indexList = await pc.listIndexes();
     const indexNames = indexList?.indexes?.map((index) => index.name) || [];
     if(!indexNames.includes(indexName)){
-        CreateIndex("gemini-user-embeddings-index")
+        CreateIndex(indexName)
     }
     // Upsert (insert or update) the embeddings into the index
     const index = pc.index(indexName);
-    await index.namespace("book").upsert(embeddings);
+    await index.namespace(email).upsert(embeddings);
 
-    console.log(`Successfully stored embeddings for user: ${userId}`);
+    console.log(`Successfully stored embeddings for user: ${email}`);
   } catch (error) {
     console.error("Error storing embeddings:", error);
     throw error;
@@ -57,7 +57,7 @@ const DeleteIndex = async () => {
     await pc.deleteIndex(indexName);
 
 }
-// // Function to check if the index exists
+//  Function to check if the index exists
 // const checkIfIndexExists = async (indexName: string) => {
 //     try {
 //         const indices = await pc.listIndexes();

@@ -1,10 +1,7 @@
-import ChatRoom from "./components/ChatRoom";
 import ClaudeChatRoom from "./components/ClaudeChatRoom";
-
-export default function Home() {
-  return (
-    <>
-      <ClaudeChatRoom></ClaudeChatRoom>
-    </>
-  );
+import { auth } from "@/auth";
+import SignIn from "./components/sign-in";
+export default async function Home() {
+  const session = await auth();
+  return <>{session ? <ClaudeChatRoom></ClaudeChatRoom> : <SignIn></SignIn>}</>;
 }
