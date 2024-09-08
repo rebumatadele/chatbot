@@ -58,7 +58,7 @@ export default function ClaudeChat() {
       setInputMessage("");
       setIsLoading(true);
 
-      const mockResponse = await SearchVector(await Session() as string, inputMessage);
+      const mockResponse = await SearchVector(await Session() || "", inputMessage);
       console.log(mockResponse);
 
       const response = await generateWithGoogle(
@@ -88,7 +88,7 @@ export default function ClaudeChat() {
       // Create a FormData object to send the file
       const formData = new FormData();
       formData.append("file", selectedFile);
-      await processFile(await Session() as string, formData);
+      await processFile(await Session() || "", formData);
       setIsUploading(false);
 
       //   const newFiles = Array.from(e.target.files)
