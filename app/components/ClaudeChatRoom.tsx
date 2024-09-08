@@ -1,86 +1,105 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { useTheme } from "next-themes"
-import { ArrowUp, Loader2, Moon, Settings, Sun, User, X, Upload } from "lucide-react"
-import { processFile } from "@/utils/create-chunk";
-import { SearchVector } from "@/utils/search-vector";
-import { generateWithAnthropic } from "@/utils/claude/integrate";
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useTheme } from "next-themes";
+import { getSession } from "next-auth/react";
+import {
+  ArrowUp,
+  Loader2,
+  Moon,
+  Settings,
+  Sun,
+  User,
+  X,
+  Upload,
+} from "lucide-react";
+import { processFile } from "@/utils/preprocess/create-chunk";
+import { SearchVector } from "@/utils/vector/pinecone/search-vector";
+import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
+import { generateWithGoogle } from "@/utils/providers/google/integrate";
 
 interface Message {
-  id: string
-  text: string
-  isUser: boolean
+  id: string;
+  text: string;
+  isUser: boolean;
 }
 
 export default function ClaudeChat() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [inputMessage, setInputMessage] = useState('')
-  const [files, setFiles] = useState<File | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const { theme, setTheme } = useTheme()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [files, setFiles] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  useEffect(scrollToBottom, [messages])
+  async function Session() {
+    const session = await getSession();
+    return session?.user?.email;
+  }
+  useEffect(scrollToBottom, [messages]);
 
   const handleSendMessage = async () => {
     if (inputMessage.trim()) {
       const newMessage: Message = {
         id: Date.now().toString(),
         text: inputMessage,
-        isUser: true
-      }
-      setMessages(prev => [...prev, newMessage])
-      setInputMessage('')
-      setIsLoading(true)
-      
-      const mockResponse = await SearchVector(inputMessage);
-      console.log(mockResponse)
-      const response = await generateWithAnthropic("You're and expert of more than 10 years in answering questions by focusing entirely on the question, answer this: " + newMessage + "using only this context and summarize and paraphrase the response, Notice: the response you give should only contain an answer to the question and nothing more" + mockResponse)
-      console.log(response)
+        isUser: true,
+      };
+      setMessages((prev) => [...prev, newMessage]);
+      setInputMessage("");
+      setIsLoading(true);
+
+      const mockResponse = await SearchVector(await Session() as string, inputMessage);
+      console.log(mockResponse);
+
+      const response = await generateWithGoogle(
+        `Given a context, summarize the user's query as a human readable response with no markdown and solely based of of the context. Return ONLY this paraphrase. context = ${mockResponse}, query = ${inputMessage}`
+      );
+      console.log(response);
+      // const response = await generateWithGoogle("Hello, explain what google is")
 
       // Simulate AI response
       setTimeout(() => {
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
-          text: response || "",
-          isUser: false
-        }
-        setMessages(prev => [...prev, aiResponse])
-        setIsLoading(false)
-      }, 2000)
+          text: response?.toString() || "",
+          isUser: false,
+        };
+        setMessages((prev) => [...prev, aiResponse]);
+        setIsLoading(false);
+      }, 2000);
     }
-  }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setIsUploading(true)
+      setIsUploading(true);
       const selectedFile = e.target.files[0];
       setFiles(selectedFile);
       // Create a FormData object to send the file
       const formData = new FormData();
       formData.append("file", selectedFile);
-      await processFile(formData);
+      await processFile(await Session() as string, formData);
       setIsUploading(false);
 
-    //   const newFiles = Array.from(e.target.files)
-      
-    //   // Simulate file upload delay
-    //   await new Promise(resolve => setTimeout(resolve, 1500))
-      
-    //   setFiles(prev => [...prev, ...newFiles])
-    //   setIsUploading(false)
+      //   const newFiles = Array.from(e.target.files)
+
+      //   // Simulate file upload delay
+      //   await new Promise(resolve => setTimeout(resolve, 1500))
+
+      //   setFiles(prev => [...prev, ...newFiles])
+      //   setIsUploading(false)
     }
-  }
+  };
 
   const removeFile = (index: number) => {
     // setFiles(prev => {
@@ -88,7 +107,7 @@ export default function ClaudeChat() {
     //   newFiles.splice(index, 1)
     //   return newFiles
     // })
-  }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
@@ -104,9 +123,13 @@ export default function ClaudeChat() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {theme === "dark" ? (
+              <Sun className="h-5 w-5" />
+            ) : (
+              <Moon className="h-5 w-5" />
+            )}
           </Button>
         </div>
       </header>
@@ -115,13 +138,15 @@ export default function ClaudeChat() {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-4`}
+            className={`flex ${
+              message.isUser ? "justify-end" : "justify-start"
+            } mb-4`}
           >
             <div
               className={`max-w-[70%] p-3 rounded-lg ${
                 message.isUser
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground'
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground"
               }`}
             >
               {message.text}
@@ -159,17 +184,17 @@ export default function ClaudeChat() {
           </Button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            <div className="flex items-center justify-between bg-background p-2 rounded">
-              <span className="truncate text-sm">{files?.name}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeFile(0)}
-                className="h-6 w-6"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="flex items-center justify-between bg-background p-2 rounded">
+            <span className="truncate text-sm">{files?.name}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => removeFile(0)}
+              className="h-6 w-6"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -181,13 +206,13 @@ export default function ClaudeChat() {
           className="flex-grow resize-none"
           rows={1}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              handleSendMessage()
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSendMessage();
             }
           }}
         />
-        <Button 
+        <Button
           onClick={handleSendMessage}
           size="icon"
           className="rounded-full h-10 w-10"
@@ -212,5 +237,5 @@ export default function ClaudeChat() {
         )}
       </footer>
     </div>
-  )
+  );
 }

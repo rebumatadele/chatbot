@@ -1,7 +1,7 @@
 "use server";
-import { storeUserVectors } from './store-vector';
+import { storeUserVectors } from '../vector/pinecone/store-vector';
 
-export const processFile = async (formData: FormData) => {
+export const processFile = async (email: string, formData: FormData) => {
     const file = formData.get('file') as File;
     
     if (!file) {
@@ -17,13 +17,13 @@ export const processFile = async (formData: FormData) => {
 
         if (fileContent) {
             // Split the file content into chunks of 1000 characters
-            const chunks = splitTextIntoChunks(fileContent, 1000, file.name);
+            const chunks = splitTextIntoChunks(fileContent, 500, file.name);
 
             // Log the chunks for debugging
             console.log("Chunks:", chunks);
 
             // Process the chunks to generate embeddings and store in Pinecone
-            await storeUserVectors("user 1", chunks);
+            await storeUserVectors(email, chunks);
         } else {
             console.warn("File content is empty or undefined.");
         }
