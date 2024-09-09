@@ -26,7 +26,7 @@ export const SearchVector = async (email: string, text: any, indexName: string, 
       });
 
       console.log("Query Response: ", queryResponse)
-      const similarityThreshold = 0.5; // Example threshold
+      const similarityThreshold = 0.8; // Example threshold
       // Check if matches were found
       if (queryResponse.matches.length > 0) {
         // Aggregate all retrieved texts into a single passage

@@ -20,7 +20,7 @@ export default async function Context(
       );
       console.log("USER QUERY: " , query)
       // Generate a query using the API
-      const newQuery = await generateWithAnthropic(`Given a context of recent chat history, summarize the user's query as a search term. 
+      const newQuery = await generateWithGoogle(`Given a context of recent chat history, summarize the user's query as a search term. 
         rephrase or (Coreference Resolution) the anaphoras including pronouns with the actual names or contexts.
         Return ONLY this paraphrase. 
         chat history= ${query} 
