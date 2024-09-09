@@ -86,14 +86,14 @@ export default function ClaudeChat() {
 
         let response;
         if (context) {
-          response = await generateWithGoogle(
+          response = await generateWithAnthropic(
             `Given the context below, answer the user query in concise and human-readable format.
             Do not specifically mention the knowledge base in your response 
              Context: ${context}, 
              User Query: ${queryResponse}`
           );
         } else {
-          response = await generateWithGoogle(
+          response = await generateWithAnthropic(
             `Based on your general knowledge, answer the user query in concise and human-readable format. 
             Do not specifically mention the knowledge base in your response 
             User Query: ${queryResponse}`
@@ -341,7 +341,7 @@ export default function ClaudeChat() {
             disabled={isLoading}
             aria-label="Clear Context"
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "X"}
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "clear context"}
           </Button>
         </div>
         {files && <p className="text-sm">Selected file: {files.name}</p>}
