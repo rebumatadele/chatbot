@@ -21,7 +21,9 @@ import { toast } from "sonner";
 import { processFile } from "@/utils/preprocess/create-chunk";
 import { SearchVector } from "@/utils/vector/pinecone/search-vector";
 import { generateWithGoogle } from "@/utils/providers/google/integrate";
-import Context from "@/utils/prompt-engineering/context-chain";
+import Context, {
+  StoreContext,
+} from "@/utils/prompt-engineering/context-chain";
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 
@@ -34,6 +36,7 @@ interface Message {
 export default function ClaudeChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
+  const [query, setQuery] = useState<string | null>(null); // Added query state
   const [files, setFiles] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -65,37 +68,42 @@ export default function ClaudeChat() {
       setInputMessage("");
 
       const userSession = await fetchSession();
-      const query = await Context(inputMessage, userSession);
+      const queryResponse = await Context(inputMessage, userSession);
+
+      const queryResp = queryResponse?.toString() || "";
+      setQuery(queryResp);
 
       try {
-        let context;
-        context = await SearchVector(
+        let context = await SearchVector(
           userSession,
-          inputMessage + " : " + query,
+          inputMessage + " : " + queryResponse,
           "context-index",
           5
         );
-        console.log("Icarus" , context)
-        let response
-        if(context){
+
+        let response;
+        if (context) {
           response = await generateWithAnthropic(
-            `Given the context below, answer the user query in concise and, human-readable format. The summary should be based solely on the context provided. Do not return any additional information or markdown. 
+            `Given the context below, answer the user query in concise and human-readable format.
+            Do not specifically mention the knowledge base in your response 
              Context: ${context}, 
-             User Query: ${query}`
+             User Query: ${queryResponse}`
           );
-        }
-        else{
+        } else {
           response = await generateWithAnthropic(
-          `Based on your general knowledge base, answer the user query in concise and, human-readable format. The summary should be explanatory. Do not return any additional information or markdown. 
-             User Query: ${query}`
+            `Based on your general knowledge, answer the user query in concise and human-readable format. 
+            Do not specifically mention the knowledge base in your response 
+            User Query: ${queryResponse}`
           );
         }
+
+        StoreContext(response?.toString() || "", userSession);
 
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
-            text: query + " : " + response?.toString() || "",
+            text: response?.toString() || "",
             isUser: false,
           },
         ]);
@@ -173,6 +181,14 @@ export default function ClaudeChat() {
       </div>
 
       <div className="p-4 bg-muted/50 border-t">
+        {/* Display query above the response when it's available */}
+        {query && (
+          <div className="flex justify-start mb-4">
+            <div className="max-w-[70%] p-3 rounded-lg bg-accent text-accent-foreground">
+              <strong>Query:</strong> {query}
+            </div>
+          </div>
+        )}
         <div className="flex items-center mb-2">
           <Input
             type="file"
@@ -254,7 +270,7 @@ export default function ClaudeChat() {
           size="icon"
           className="rounded-full h-10 w-10"
           disabled={isLoading}
-          aria-label="Send Message"
+          aria-label="Clear Context"
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "X"}
         </Button>
@@ -262,12 +278,12 @@ export default function ClaudeChat() {
 
       <footer className="p-2 bg-background border-t text-center text-sm text-muted-foreground">
         {isLoading ? (
-          <div className="flex items-center justify-center space-x-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Claude is thinking...</span>
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Loading...
           </div>
         ) : (
-          <span>Claude is ready</span>
+          <span>Claude AI Chat</span>
         )}
       </footer>
     </div>

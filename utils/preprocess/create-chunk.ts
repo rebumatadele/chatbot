@@ -17,7 +17,7 @@ export const processFile = async (email: string, formData: FormData) => {
 
         if (fileContent) {
             // Split the file content into chunks of 1000 characters
-            const chunks = splitTextIntoChunks(fileContent, 500, file.name);
+            const chunks = await splitTextIntoChunks(fileContent, 500, file.name);
 
             // Log the chunks for debugging
             console.log("Chunks:", chunks);
@@ -33,19 +33,37 @@ export const processFile = async (email: string, formData: FormData) => {
 };
 
 // Helper function to split the text into chunks with period search
-const splitTextIntoChunks = (text: string, chunkSize: number, source: string) => {
+export const splitTextIntoChunks = (text: string, chunkSize: number, source: string) => {
     const chunks = [];
     let startIndex = 0;
 
+    // If text is shorter than the chunk size, push the entire text
+    if (text.length <= chunkSize) {
+        chunks.push({
+            content: text,
+            metadata: {
+                source,
+                startIndex,
+            },
+        });
+        return chunks;
+    }
+
+    // Split the text into chunks
     while (startIndex < text.length) {
         let endIndex = startIndex + chunkSize;
 
-        // Look for a period within the next 50 characters after the chunk
-        const periodIndex = text.slice(endIndex, endIndex + 50).indexOf('.');
+        // If chunk size exceeds the remaining text, push what's left
+        if (endIndex >= text.length) {
+            endIndex = text.length;
+        } else {
+            // Look for a period within the next 50 characters after the chunk
+            const periodIndex = text.slice(endIndex, endIndex + 50).indexOf('.');
 
-        // If a period is found, adjust the endIndex to include it
-        if (periodIndex !== -1) {
-            endIndex += periodIndex + 1; // Include the period
+            // If a period is found, adjust the endIndex to include it
+            if (periodIndex !== -1) {
+                endIndex += periodIndex + 1; // Include the period
+            }
         }
 
         const chunk = text.slice(startIndex, endIndex);
@@ -64,4 +82,3 @@ const splitTextIntoChunks = (text: string, chunkSize: number, source: string) =>
 
     return chunks;
 };
-
