@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,7 @@ import {
   User,
   X,
   Upload,
+  Clipboard,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,17 +26,19 @@ import Context, {
 } from "@/utils/prompt-engineering/context-chain";
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
+import { marked } from "marked"; // Import the Markdown parser
 
 interface Message {
   id: string;
-  text: string;
+  type: "text" | "code" | "list" | "mixed";
+  content: string | string[];
   isUser: boolean;
 }
 
 export default function ClaudeChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [query, setQuery] = useState<string | null>(null); // Added query state
+  const [query, setQuery] = useState<string | null>(null);
   const [files, setFiles] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -61,7 +63,8 @@ export default function ClaudeChat() {
 
       const newMessage: Message = {
         id: Date.now().toString(),
-        text: inputMessage,
+        type: "text",
+        content: inputMessage,
         isUser: true,
       };
       setMessages((prev) => [...prev, newMessage]);
@@ -83,14 +86,14 @@ export default function ClaudeChat() {
 
         let response;
         if (context) {
-          response = await generateWithAnthropic(
+          response = await generateWithGoogle(
             `Given the context below, answer the user query in concise and human-readable format.
             Do not specifically mention the knowledge base in your response 
              Context: ${context}, 
              User Query: ${queryResponse}`
           );
         } else {
-          response = await generateWithAnthropic(
+          response = await generateWithGoogle(
             `Based on your general knowledge, answer the user query in concise and human-readable format. 
             Do not specifically mention the knowledge base in your response 
             User Query: ${queryResponse}`
@@ -99,20 +102,53 @@ export default function ClaudeChat() {
 
         StoreContext(response?.toString() || "", userSession);
 
+        // Handle mixed content types
+        const formattedContent = await formatMixedContent(
+          response?.toString() || ""
+        );
+
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
-            text: response?.toString() || "",
+            type: "mixed",
+            content: formattedContent,
             isUser: false,
           },
         ]);
       } catch (error) {
         console.error("Error fetching response:", error);
+        toast.error("Failed to fetch response");
       } finally {
         setIsLoading(false);
       }
     }
+  };
+
+  const formatMixedContent = async (response: string): Promise<string[]> => {
+    const htmlContent = await marked.parse(response); // Convert Markdown to HTML
+    const div = document.createElement("div");
+    div.innerHTML = htmlContent;
+
+    const content: string[] = [];
+    div.childNodes.forEach((node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as HTMLElement;
+        if (element.tagName === "PRE") {
+          content.push(`\`\`\`\n${element.textContent}\n\`\`\``);
+        } else if (element.tagName === "UL") {
+          element.querySelectorAll("li").forEach((li) => {
+            content.push(`- ${li.textContent}`);
+          });
+        } else {
+          content.push(element.textContent || "");
+        }
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        content.push(node.textContent || "");
+      }
+    });
+
+    return content.filter((line) => line.trim().length > 0); // Filter out empty lines
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,17 +156,39 @@ export default function ClaudeChat() {
       setIsUploading(true);
       const selectedFile = e.target.files[0];
       setFiles(selectedFile);
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      let formData = new FormData();
+      if (selectedFile.type === "application/pdf") {
+        // Handle PDF files if needed
+      } else {
+        formData.append("file", selectedFile);
+      }
 
       try {
         await processFile(await fetchSession(), formData);
       } catch (error) {
         console.error("File processing error:", error);
+        toast.error("Failed to process file");
       } finally {
         setIsUploading(false);
       }
     }
+  };
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault(); // Prevents moving to the next line
+      if (inputMessage.trim() !== "") {
+        handleSendMessage(); // Call the submit function
+        setInputMessage(""); // Clear the textarea after submission
+      }
+    }
+  };
+
+  const handleCopy = (content: string | string[]) => {
+    if (Array.isArray(content)) {
+      content = content.join("\n");
+    }
+    navigator.clipboard.writeText(content);
+    toast.success("Code copied to clipboard!");
   };
 
   return (
@@ -157,7 +215,6 @@ export default function ClaudeChat() {
           </Button>
         </div>
       </header>
-
       <div className="flex-grow overflow-y-auto p-4">
         {messages.map((message) => (
           <div
@@ -173,7 +230,56 @@ export default function ClaudeChat() {
                   : "bg-secondary text-secondary-foreground"
               }`}
             >
-              {message.text}
+              {message.type === "text" && <p>{message.content}</p>}
+              {message.type === "code" && (
+                <div className="relative">
+                  <pre className="bg-gray-200 p-3 rounded">
+                    <code>{message.content}</code>
+                  </pre>
+                  <Button
+                    onClick={() => handleCopy(message.content)}
+                    className="absolute top-2 right-2"
+                    variant="ghost"
+                    size="icon"
+                  >
+                    <Clipboard className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {/* Handle mixed content */}
+              {message.type === "mixed" && Array.isArray(message.content) && (
+                <div>
+                  {message.content.map((line, index) => {
+                    if (line.startsWith("```")) {
+                      return (
+                        <div key={index} className="relative">
+                          <pre className="bg-gray-200 p-3 rounded">
+                            <code>{line.substring(3, line.length - 3)}</code>
+                          </pre>
+                          <Button
+                            onClick={() =>
+                              handleCopy(line.substring(3, line.length - 3))
+                            }
+                            className="absolute top-2 right-2"
+                            variant="ghost"
+                            size="icon"
+                          >
+                            <Clipboard className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    } else if (line.startsWith("- ")) {
+                      return (
+                        <ul key={index} className="list-disc pl-5">
+                          <li>{line.substring(2)}</li>
+                        </ul>
+                      );
+                    } else {
+                      return <p key={index}>{line}</p>;
+                    }
+                  })}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -181,7 +287,6 @@ export default function ClaudeChat() {
       </div>
 
       <div className="p-4 bg-muted/50 border-t">
-        {/* Display query above the response when it's available */}
         {query && (
           <div className="flex justify-start mb-4">
             <div className="max-w-[70%] p-3 rounded-lg bg-accent text-accent-foreground">
@@ -189,7 +294,7 @@ export default function ClaudeChat() {
             </div>
           </div>
         )}
-        <div className="flex items-center mb-2">
+        <div className="flex items-center mb-2 gap-3">
           <Input
             type="file"
             ref={fileInputRef}
@@ -197,95 +302,50 @@ export default function ClaudeChat() {
             className="hidden"
           />
           <Button
-            variant="outline"
             onClick={() => fileInputRef.current?.click()}
+            variant="outline"
+            size="icon"
+            className="mr-2"
             disabled={isUploading}
-            aria-label="Upload Files"
           >
             {isUploading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Uploading...
-              </>
+              <Loader2 className="animate-spin h-5 w-5" />
             ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Files
-              </>
+              <Upload className="h-5 w-5" />
             )}
           </Button>
+
+          <Textarea
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-grow mr-2"
+            rows={2}
+            disabled={isLoading}
+            onKeyDown={handleKeyDown} // Attach the keydown event
+          />
+          <Button onClick={handleSendMessage} disabled={isLoading}>
+            {isLoading ? (
+              <Loader2 className="animate-spin h-5 w-5" />
+            ) : (
+              <ArrowUp className="h-5 w-5" />
+            )}
+          </Button>
+          <Button
+            onClick={() => {
+              DeleteIndex("context-index");
+              DeleteIndex("query-index");
+              setMessages([]);
+              toast.warning("Context cleared Successfully");
+            }}
+            disabled={isLoading}
+            aria-label="Clear Context"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "X"}
+          </Button>
         </div>
-        {files && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            <div className="flex items-center justify-between bg-background p-2 rounded">
-              <span className="truncate text-sm">{files.name}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                aria-label="Remove File"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        {files && <p className="text-sm">Selected file: {files.name}</p>}
       </div>
-
-      <div className="flex items-end space-x-2 p-4 bg-background border-t">
-        <Textarea
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          placeholder="Type your message here..."
-          className="flex-grow resize-none"
-          rows={1}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSendMessage();
-            }
-          }}
-        />
-        <Button
-          onClick={handleSendMessage}
-          size="icon"
-          className="rounded-full h-10 w-10"
-          disabled={isLoading}
-          aria-label="Send Message"
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <ArrowUp className="h-4 w-4" />
-          )}
-        </Button>
-
-        <Button
-          onClick={() => {
-            DeleteIndex("context-index");
-            DeleteIndex("query-index");
-            setMessages([]);
-            toast("Context cleared Successfully");
-          }}
-          size="icon"
-          className="rounded-full h-10 w-10"
-          disabled={isLoading}
-          aria-label="Clear Context"
-        >
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "X"}
-        </Button>
-      </div>
-
-      <footer className="p-2 bg-background border-t text-center text-sm text-muted-foreground">
-        {isLoading ? (
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Loading...
-          </div>
-        ) : (
-          <span>Claude AI Chat</span>
-        )}
-      </footer>
     </div>
   );
 }
