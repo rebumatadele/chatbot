@@ -13,6 +13,7 @@ import { generateWithGoogle } from "@/utils/providers/google/integrate";
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 import { processFile } from "@/utils/preprocess/create-chunk";
 import PDF from "@/utils/preprocess/pdf-parsing"; // Ensure this is imported
+import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 
 export default function SearchRoom() {
   const [files, setFiles] = useState<File[]>([]);
@@ -77,7 +78,7 @@ export default function SearchRoom() {
 
       let response;
       if (context) {
-        response = await generateWithGoogle(
+        response = await generateWithAnthropic(
           `Rewrite the following paragraphs into cohesive human readable ones
           i want you to return all the paragraphs
           separate the paragraphs using line breaks
@@ -85,12 +86,11 @@ export default function SearchRoom() {
           the paragraphs: ${context}`
         );
       }
-      if(response == null){
-        toast.warning("Network Error Try Again")
+      if (response == null) {
+        toast.warning("Network Error Try Again");
+      } else {
+        setOutputs([`${response}`]);
       }
-      setOutputs([
-        `${response}`,
-      ]);
     } catch (error) {
       toast.warning("Search was not successful");
       console.error("Search error:", error);
@@ -121,7 +121,9 @@ export default function SearchRoom() {
             onChange={handleFileChange}
             className="w-full"
           />
-          {isUploading && <p className="text-sm text-muted-foreground">Uploading...</p>}
+          {isUploading && (
+            <p className="text-sm text-muted-foreground">Uploading...</p>
+          )}
           <p className="text-sm text-muted-foreground">
             Selected files: {files.map((file) => file.name).join(", ")}
           </p>

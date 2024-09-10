@@ -24,7 +24,7 @@ import { generateWithGoogle } from "@/utils/providers/google/integrate";
 import{
   StoreContext
 } from "@/utils/prompt-engineering/context-chain";
-import Context from "@/utils/prompt-engineering/openai-context-chain"
+import Context from "@/utils/prompt-engineering/context-chain"
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 import { marked } from "marked"; // Import the Markdown parser
@@ -89,7 +89,7 @@ export default function ClaudeChat() {
 
         let response;
         if (context) {
-          response = await generateWithGoogle(
+          response = await generateWithAnthropic(
             `Given the context below, answer the user query in concise and human-readable format.
             Do not specifically mention the knowledge base in your response 
             User Query asked : ${queryResponse} 
@@ -97,7 +97,7 @@ export default function ClaudeChat() {
             `
           );
         } else {
-          response = await generateWithGoogle(
+          response = await generateWithAnthropic(
             `Based on your general knowledge, answer the user query in concise and human-readable format. 
             Do not specifically mention the knowledge base in your response 
             User Query: ${queryResponse}`
