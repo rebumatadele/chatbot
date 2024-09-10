@@ -4,20 +4,19 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import pdfParser from "pdf-parse";
 
-export default async function PDF(formData: FormData) {
+export default async function PDF(formData: any) {
     const file = formData.get("pdf");
     console.log("I am here");
-    
-    if (!(file instanceof File)) {
+
+    if (!file) {
         throw new Error("No valid PDF file provided");
     }
 
-    // Generate a unique filename and save directory
     const fileName = `${uuidv4()}.pdf`;
-    const filePath = path.join(process.cwd(), "temp", fileName);
+    const filePath = path.join(process.cwd(), "/temp", fileName);
 
     try {
-        // Create a buffer from the file and save it to disk
+        // Handle file as a buffer directly
         const buffer = Buffer.from(await file.arrayBuffer());
 
         // Ensure the temp folder exists
@@ -32,8 +31,8 @@ export default async function PDF(formData: FormData) {
         }
 
         const dataBuffer = fs.readFileSync(filePath);
-        
-        // Parse the PDF file from the path
+
+        // Parse the PDF file
         console.log("File Path", filePath);
         const pdfData = await pdfParser(dataBuffer);
         console.log("pdf data", pdfData);
@@ -44,7 +43,7 @@ export default async function PDF(formData: FormData) {
         console.error("Error processing PDF:", error);
         throw new Error("Failed to process PDF");
     } finally {
-        // Clean up and remove the file after processing
+        // Clean up the file after processing
         try {
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
