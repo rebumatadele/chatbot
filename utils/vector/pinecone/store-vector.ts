@@ -1,12 +1,10 @@
 "use server";
 import { Pinecone } from "@pinecone-database/pinecone";
-import { processEmbeddings } from "../../embeddings/gemini-embedding"; // Import the embedding function
+import { processEmbeddings } from "../../embeddings/create-embeding"; // Import the embedding function
 
 // Initialize Pinecone client
 const api_key = process.env.PINECONE_API_KEY || "";
-const pc = new Pinecone({
-  apiKey: api_key,
-});
+const pc = new Pinecone({ apiKey: api_key });
 
 // Function to store user-specific vectors
 export const storeUserVectors = async (
@@ -14,137 +12,114 @@ export const storeUserVectors = async (
   chunks: { content: string; metadata: any }[],
   indexName: string,
 ) => {
-  const maxRetries = 3;
-  const retryDelay = 1000; // 1-second delay
-
   try {
     // Generate embeddings for the chunks
     const embeddings = await processEmbeddings(email, chunks);
 
-    // Get a list of indexes with retry logic
-    let indexList;
-    let indexNames;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        indexList = await pc.listIndexes();
-        indexNames = indexList?.indexes?.map((index) => index.name) || [];
-        break; // Exit loop if successful
-      } catch (error) {
-        console.error(`Attempt ${attempt} to list indexes failed:`, error);
-        if (attempt < maxRetries) {
-          console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-          await delay(retryDelay);
-        } else {
-          throw error; // If all retries fail, propagate the error
-        }
-      }
-    }
+    // Get the list of indexes with retry logic
+    const indexNames = await retryOn404(() => pc.listIndexes(), 3, 1000)
+      .then(indexList => indexList?.indexes?.map((index) => index.name) || []);
 
-    if (!indexNames?.includes(indexName)) {
+    // Create index if it doesn't exist
+    if (!indexNames.includes(indexName)) {
       await CreateIndex(indexName);
 
-      // Recheck index availability with retry logic
-      let indexExists = false;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          await delay(2000); // 2-second delay before rechecking
-          indexList = await pc.listIndexes();
-          indexNames = indexList?.indexes?.map((index) => index.name) || [];
-          if (indexNames.includes(indexName)) {
-            indexExists = true;
-            break;
-          }
-        } catch (error) {
-          console.error(`Attempt ${attempt + 1} to recheck index failed:`, error);
-          if (attempt < maxRetries - 1) {
-            await delay(retryDelay);
-          } else {
-            throw error;
-          }
-        }
-      }
-
-      if (!indexExists) {
-        throw new Error(`Index ${indexName} was not found after creation.`);
-      }
+      // Poll for index readiness
+      await pollIndexReadiness(indexName);
     }
 
-    // Fetch the index and upsert embeddings with retry logic
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const index = pc.index(indexName);
-        await index.namespace(email).upsert(embeddings);
-        console.log(`Successfully stored embeddings for user : ${email}`);
-        break; // Exit loop if successful
-      } catch (error) {
-        console.error(`Attempt ${attempt} to upsert embeddings failed:`, error);
-        if (attempt < maxRetries) {
-          console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-          await delay(retryDelay);
-        } else {
-          throw error;
-        }
-      }
-    }
+    // Fetch the index and upsert embeddings
+    const index = pc.index(indexName);
+    await retryOn404(() => index.namespace(email).upsert(embeddings), 3, 1000);
+
+    console.log(`Successfully stored embeddings for user: ${email}`);
   } catch (error) {
     console.error("Error storing embeddings:", error);
     throw error;
   }
 };
 
-// Function to create an index if it doesn't exist with retry logic
+// Function to create an index
 const CreateIndex = async (indexName: string) => {
-  const maxRetries = 3;
-  const retryDelay = 1000; // 1-second delay
+  try {
+    await pc.createIndex({
+      name: indexName,
+      dimension: 1536, // Your model dimensions
+      metric: 'cosine', // Your model metric
+      spec: {
+        serverless: {
+          cloud: 'aws',
+          region: 'us-east-1',
+        },
+      },
+    });
+    console.log(`Index ${indexName} created successfully.`);
+  } catch (error) {
+    console.error(`Error creating index ${indexName}:`, error);
+    throw error;
+  }
+};
 
+// Function to poll index readiness
+const pollIndexReadiness = async (indexName: string, maxRetries = 10, retryDelay = 5000): Promise<void> => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await pc.createIndex({
-        name: indexName,
-        dimension: 768, // Replace with your model dimensions
-        metric: 'cosine', // Replace with your model metric
-        spec: {
-          serverless: {
-            cloud: 'aws',
-            region: 'us-east-1',
-          },
-        },
-      });
-      console.log(`Index ${indexName} created successfully.`);
-      break; // Exit loop if successful
+      const describeIndex = await pc.describeIndex(indexName);
+      if (describeIndex.status?.ready) {
+        console.log(`Index ${indexName} is ready.`);
+        return;
+      }
     } catch (error) {
-      console.error(`Attempt ${attempt} to create index ${indexName} failed:`, error);
-      if (attempt < maxRetries) {
-        console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-        await delay(retryDelay);
+      console.error(`Error checking index status`);
+    }
+
+    console.log(`Index ${indexName} is not ready. Retrying in ${retryDelay / 1000} seconds...`);
+    await delay(retryDelay);
+  }
+
+  throw new Error(`Index ${indexName} was not ready after ${maxRetries} attempts.`);
+};
+
+// Retry logic with error handling for specific cases (404 errors)
+const retryOn404 = async <T>(fn: () => Promise<T>, maxRetries: number, retryDelay: number): Promise<T> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.error(`Attempt ${attempt} failed with 404:`, error);
+        if (attempt < maxRetries) {
+          console.log(`Retrying in ${retryDelay / 1000} seconds...`);
+          await delay(retryDelay);
+        } else {
+          throw error;
+        }
       } else {
-        throw error;
+        throw error; // Throw other errors directly
       }
     }
   }
+  throw new Error('Max retries reached.');
 };
 
 // Utility function for delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Optional: Function to delete an index with retry logic
-export const DeleteIndex = async (indexName: string) => {
-  const maxRetries = 3;
-  const retryDelay = 1000; // 1-second delay
+// Optional: Function to delete an index with retry logic for 404 errors and index existence check
+export const DeleteIndex = async (indexName: string): Promise<string> => {
+  try {
+    // Check if the index exists before attempting to delete
+    const indexNames = await retryOn404(() => pc.listIndexes(), 3, 1000)
+      .then(indexList => indexList?.indexes?.map((index) => index.name) || []);
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await pc.deleteIndex(indexName);
-      console.log(`Index ${indexName} deleted successfully.`);
-      break; // Exit loop if successful
-    } catch (error) {
-      console.error(`Attempt ${attempt} to delete index ${indexName} failed:`, error);
-      if (attempt < maxRetries) {
-        console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-        await delay(retryDelay);
-      } else {
-        throw error;
-      }
+    if (!indexNames.includes(indexName)) {
+      return `Index ${indexName} does not exist, skipping deletion.`;
     }
+
+    // Proceed with deletion if the index exists
+    await retryOn404(() => pc.deleteIndex(indexName), 3, 1000);
+    return `Index ${indexName} deleted successfully.`;
+  } catch (error) {
+    return `Error deleting index ${indexName}`;
   }
 };

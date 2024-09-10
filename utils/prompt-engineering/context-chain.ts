@@ -16,26 +16,25 @@ export default async function Context(
         email,
         inputMessage,
         "query-index",
-        3
+        10
       );
-      console.log("USER QUERY: " , query)
+      const inp = `
+        Given the recent chat history, summarize the user's query as a search term. 
+        Resolve any pronouns or anaphoras with their actual names or contexts.
+        If the user query mentions a PDF or text file, replace it with the phrase "based on the following".
+        Return ONLY the paraphrase or search term.
+        Chat history: ${query}
+        User query: ${inputMessage.replace(/pdf|text file/gi, "based on the following")}
+        `;
       // Generate a query using the API
-      const newQuery = await generateWithGoogle(`Given a context of recent chat history, summarize the user's query as a search term. 
-        rephrase or (Coreference Resolution) the anaphoras including pronouns with the actual names or contexts.
-        Return ONLY this paraphrase. 
-        chat history= ${query} 
-        and user query= ${inputMessage}`);
-      console.log(newQuery)
+      const newQuery = await generateWithGoogle(inp);
     return newQuery
 }
 
 export async function StoreContext(
   inputMessage: string,
   email: string){
-  // Store the query in the Vector Database
   const chunks = await splitTextIntoChunks(inputMessage, 100, "");
   console.log(chunks)
-  // let inp = [];
-  // inp.push({ content: inputMessage, metadata: "" });
   await storeUserVectors(email, chunks, "query-index");
 }

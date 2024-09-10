@@ -9,7 +9,7 @@ const embeddingModel = new OpenAIEmbeddings({
 
 // Function to process embeddings with user metadata
 export const processEmbeddings = async (
-  userId: string,
+  email: string,
   chunks: { content: string; metadata: any }[]
 ) => {
   try {
@@ -21,9 +21,9 @@ export const processEmbeddings = async (
 
       // Push embedding with metadata for storing
       embeddings.push({
-        id: `user-${userId}-chunk-${i}`, // Unique ID for each chunk
+        id: `user-${email}-chunk-${i}-${Math.random()}`, // Unique ID for each chunk
         values: embedding,
-        metadata: { ...chunk.metadata, userId, text: chunk.content }, // Include original text
+        metadata: { ...chunk.metadata, email, text: chunk.content }, // Include original text
       });
 
       console.log(`Embedding for chunk: ${i} :`, chunk.content);
