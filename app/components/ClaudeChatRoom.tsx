@@ -21,12 +21,15 @@ import { toast } from "sonner";
 import { processFile } from "@/utils/preprocess/create-chunk";
 import { SearchVector } from "@/utils/vector/pinecone/search-vector";
 import { generateWithGoogle } from "@/utils/providers/google/integrate";
-import Context, {
-  StoreContext,
+import{
+  StoreContext
 } from "@/utils/prompt-engineering/context-chain";
+import Context from "@/utils/prompt-engineering/openai-context-chain"
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 import { marked } from "marked"; // Import the Markdown parser
+import PDF from "@/utils/preprocess/pdf-parsing";
+import Header from "./Header";
 
 interface Message {
   id: string;
@@ -81,7 +84,7 @@ export default function ClaudeChat() {
           userSession,
           inputMessage + " : " + queryResponse,
           "context-index",
-          5
+          10
         );
 
         let response;
@@ -89,8 +92,9 @@ export default function ClaudeChat() {
           response = await generateWithGoogle(
             `Given the context below, answer the user query in concise and human-readable format.
             Do not specifically mention the knowledge base in your response 
-             Context: ${context}, 
-             User Query: ${queryResponse}`
+            User Query asked : ${queryResponse} 
+            answer it based on the Context: ${context}, 
+            `
           );
         } else {
           response = await generateWithGoogle(
@@ -159,6 +163,10 @@ export default function ClaudeChat() {
       let formData = new FormData();
       if (selectedFile.type === "application/pdf") {
         // Handle PDF files if needed
+        const fd = new FormData()
+        fd.append("pdf", selectedFile)
+        formData.append("file", await PDF(fd))
+
       } else {
         formData.append("file", selectedFile);
       }
@@ -193,28 +201,7 @@ export default function ClaudeChat() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <header className="flex justify-between items-center p-4 bg-background border-b">
-        <div className="text-2xl font-bold">Claude AI</div>
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon">
-            <User className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-      </header>
+      <Header></Header>
       <div className="flex-grow overflow-y-auto p-4">
         {messages.map((message) => (
           <div
@@ -333,10 +320,9 @@ export default function ClaudeChat() {
           </Button>
           <Button
             onClick={() => {
-              DeleteIndex("context-index");
-              DeleteIndex("query-index");
+              toast.warning(DeleteIndex("context-index"))
+              toast.warning(DeleteIndex("query-index"));
               setMessages([]);
-              toast.warning("Context cleared Successfully");
             }}
             disabled={isLoading}
             aria-label="Clear Context"

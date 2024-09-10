@@ -1,23 +1,25 @@
 "use server";
 import { storeUserVectors } from '../vector/pinecone/store-vector';
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter"
 
-export const processFile = async (email: string, formData: FormData) => {
-    const file = formData.get('file') as File;
+export const processFile = async (email: string, formData: FormData) => {    
+    const file = formData.get('file');
     
     if (!file) {
         console.warn("No file provided.");
         return;
     }
 
-    console.log("Processing file:", file.name);
-
     try {
-        // Read the file content as text
-        const fileContent = await file.text();
+        // Read the file content as text or use the string directly
+        const fileContent = file instanceof File ? await file.text() : file;
 
         if (fileContent) {
-            // Split the file content into chunks of 1000 characters
-            const chunks = await splitTextIntoChunks(fileContent, 500, file.name);
+            // Use file name if it's a File, otherwise a default name for string content
+            const fileName = file instanceof File ? file.name : 'uploaded-text';
+
+            // Split the file content into chunks of 2000 characters
+            const chunks = await splitTextIntoChunks(fileContent, 2000, fileName);
 
             // Log the chunks for debugging
             console.log("Chunks:", chunks);
@@ -32,53 +34,19 @@ export const processFile = async (email: string, formData: FormData) => {
     }
 };
 
-// Helper function to split the text into chunks with period search
-export const splitTextIntoChunks = (text: string, chunkSize: number, source: string) => {
-    const chunks = [];
-    let startIndex = 0;
 
-    // If text is shorter than the chunk size, push the entire text
-    if (text.length <= chunkSize) {
-        chunks.push({
-            content: text,
-            metadata: {
-                source,
-                startIndex,
-            },
-        });
-        return chunks;
-    }
+// Helper function to split the text into chunks with metadata
+export const splitTextIntoChunks = async (text: string, chunkSize: number, source: string) => {
+    const splitter = new RecursiveCharacterTextSplitter({
+        chunkSize: chunkSize,
+        chunkOverlap: Math.ceil(chunkSize/10),
+    });
 
-    // Split the text into chunks
-    while (startIndex < text.length) {
-        let endIndex = startIndex + chunkSize;
+    const chunks = await splitter.createDocuments([text]);
 
-        // If chunk size exceeds the remaining text, push what's left
-        if (endIndex >= text.length) {
-            endIndex = text.length;
-        } else {
-            // Look for a period within the next 50 characters after the chunk
-            const periodIndex = text.slice(endIndex, endIndex + 50).indexOf('.');
-
-            // If a period is found, adjust the endIndex to include it
-            if (periodIndex !== -1) {
-                endIndex += periodIndex + 1; // Include the period
-            }
-        }
-
-        const chunk = text.slice(startIndex, endIndex);
-        const chunkData = {
-            content: chunk,
-            metadata: {
-                source,
-                startIndex,
-            },
-        };
-        chunks.push(chunkData);
-
-        // Update the startIndex for the next chunk
-        startIndex = endIndex;
-    }
-
-    return chunks;
+    // Return an array of objects with content and metadata
+    return chunks.map(chunk => ({
+        content: chunk.pageContent, // Extract chunk text
+        metadata: { source }        // Attach metadata (source)
+    }));
 };
