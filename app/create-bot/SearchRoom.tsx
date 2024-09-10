@@ -78,7 +78,7 @@ export default function SearchRoom() {
 
       let response;
       if (context) {
-        response = await generateWithAnthropic(
+        response = await generateWithGoogle(
           `Rewrite the following paragraphs into cohesive human readable ones
           i want you to return all the paragraphs
           separate the paragraphs using line breaks
