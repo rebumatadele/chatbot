@@ -1,22 +1,22 @@
 "use server";
 import { storeUserVectors } from '../vector/pinecone/store-vector';
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter"
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
-export const processFile = async (email: string, formData: FormData) => {    
-    const file = formData.get('file');
-    
+export const processFile = async (email: string, formData: any) => {
+    const file = formData.get('file'); // Fetch file from formData (Buffer or string expected)
+
     if (!file) {
         console.warn("No file provided.");
         return;
     }
 
     try {
-        // Read the file content as text or use the string directly
-        const fileContent = file instanceof File ? await file.text() : file;
+        // Assuming the file is a buffer, convert it to a string
+        const fileContent = typeof file === "string" ? file : Buffer.from(await file.arrayBuffer()).toString('utf-8');
 
         if (fileContent) {
-            // Use file name if it's a File, otherwise a default name for string content
-            const fileName = file instanceof File ? file.name : 'uploaded-text';
+            // Use a default name for the uploaded content
+            const fileName = 'uploaded-text';
 
             // Split the file content into chunks of 2000 characters
             const chunks = await splitTextIntoChunks(fileContent, 2000, fileName);
@@ -24,7 +24,7 @@ export const processFile = async (email: string, formData: FormData) => {
             // Log the chunks for debugging
             console.log("Chunks:", chunks);
 
-            // Process the chunks to generate embeddings and store in Pinecone
+            // Store the chunks in Pinecone (vector database)
             await storeUserVectors(email, chunks, "context-index");
         } else {
             console.warn("File content is empty or undefined.");
@@ -34,19 +34,18 @@ export const processFile = async (email: string, formData: FormData) => {
     }
 };
 
-
 // Helper function to split the text into chunks with metadata
 export const splitTextIntoChunks = async (text: string, chunkSize: number, source: string) => {
     const splitter = new RecursiveCharacterTextSplitter({
         chunkSize: chunkSize,
-        chunkOverlap: Math.ceil(chunkSize/10),
+        chunkOverlap: Math.ceil(chunkSize / 10), // 10% overlap
     });
 
     const chunks = await splitter.createDocuments([text]);
 
     // Return an array of objects with content and metadata
     return chunks.map(chunk => ({
-        content: chunk.pageContent, // Extract chunk text
-        metadata: { source }        // Attach metadata (source)
+        content: chunk.pageContent,  // Extract chunk text
+        metadata: { source }         // Attach metadata (source)
     }));
 };
