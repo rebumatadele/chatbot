@@ -1,6 +1,6 @@
 "use server";
 import { Pinecone } from '@pinecone-database/pinecone';
-import { embedQuery } from '../../embeddings/create-embeding';
+import { embedQuery } from '../../embeddings/gemini-embedding';
 
 // Initialize Pinecone client
 const api_key = process.env.PINECONE_API_KEY || "";

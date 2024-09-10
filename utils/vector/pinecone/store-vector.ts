@@ -1,6 +1,6 @@
 "use server";
 import { Pinecone } from "@pinecone-database/pinecone";
-import { processEmbeddings } from "../../embeddings/create-embeding"; // Import the embedding function
+import { processEmbeddings } from "../../embeddings/gemini-embedding"; // Import the embedding function
 
 // Initialize Pinecone client
 const api_key = process.env.PINECONE_API_KEY || "";
@@ -44,7 +44,7 @@ const CreateIndex = async (indexName: string) => {
   try {
     await pc.createIndex({
       name: indexName,
-      dimension: 1536, // Your model dimensions
+      dimension: 768, // Your model dimensions
       metric: 'cosine', // Your model metric
       spec: {
         serverless: {
