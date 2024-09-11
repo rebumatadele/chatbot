@@ -4,7 +4,9 @@ import { BufferMemory } from "langchain/memory";
 import { ConversationChain } from "langchain/chains";
 import  Con from "./context-chain";
 
-const model = new OpenAI({});
+const model = new OpenAI({
+    model: "gpt-4",
+});
 const memory = new BufferMemory();
 const chain = new ConversationChain({ llm: model, memory: memory });
 
