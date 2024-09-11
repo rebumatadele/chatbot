@@ -1,15 +1,20 @@
-'use client'
+"use client";
 
-import React from 'react'
-import Header from '../components/Header'
+import React, { useState } from "react";
+import Header from "../components/Header";
 
-import SearchRoom from './SearchRoom'
+import SearchRoom from "./SearchRoom";
 
 export default function Page() {
+  const [useClaude, setUseClaude] = useState(false);
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <SearchRoom/>
+      <Header
+        switchProvider={() => {
+          setUseClaude((prev) => !prev);
+        }}
+      />
+      <SearchRoom switchClaude={useClaude}/>
     </div>
-  )
+  );
 }
