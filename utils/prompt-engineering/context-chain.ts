@@ -27,7 +27,7 @@ export default async function Context(
         User query: ${inputMessage.replace(/pdf|text file/gi, "based on the following")}
         `;
       // Generate a query using the API
-      const newQuery = await generateWithAnthropic(inp);
+      const newQuery = await generateWithGoogle(inp);
     return newQuery
 }
 

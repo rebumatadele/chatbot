@@ -8,11 +8,6 @@ import { getSession } from "next-auth/react";
 import {
   ArrowUp,
   Loader2,
-  Moon,
-  Settings,
-  Sun,
-  User,
-  X,
   Upload,
   Clipboard,
 } from "lucide-react";
@@ -21,10 +16,8 @@ import { toast } from "sonner";
 import { processFile } from "@/utils/preprocess/create-chunk";
 import { SearchVector } from "@/utils/vector/pinecone/search-vector";
 import { generateWithGoogle } from "@/utils/providers/google/integrate";
-import{
-  StoreContext
-} from "@/utils/prompt-engineering/context-chain";
-import Context from "@/utils/prompt-engineering/context-chain"
+import { StoreContext } from "@/utils/prompt-engineering/context-chain";
+import Context from "@/utils/prompt-engineering/context-chain";
 import { DeleteIndex } from "@/utils/vector/pinecone/store-vector";
 import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 import { marked } from "marked"; // Import the Markdown parser
@@ -48,6 +41,7 @@ export default function ClaudeChat() {
   const { theme, setTheme } = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [useClaude, setUseClaude] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -89,20 +83,37 @@ export default function ClaudeChat() {
 
         let response;
         if (context) {
-          response = await generateWithAnthropic(
-            `Given the context below, answer the user query in concise and human-readable format.
-            Do not specifically mention the knowledge base in your response 
-            User Query asked : ${queryResponse} 
-            answer it based on the Context: ${context}, 
-            if you find no relation between the context and the user query answer based on your knowledge base
-            `
-          );
+          if (useClaude) {
+            response = await generateWithAnthropic(
+              `Given the context below, answer the user query in concise and human-readable format.
+              Do not specifically mention the knowledge base in your response 
+              User Query asked : ${queryResponse} 
+              answer it based on the Context: ${context}, 
+              `
+            );
+          } else {
+            response = await generateWithGoogle(
+              `Given the context below, answer the user query in concise and human-readable format.
+              Do not specifically mention the knowledge base in your response 
+              User Query asked : ${queryResponse} 
+              answer it based on the Context: ${context}
+              `
+            );
+          }
         } else {
-          response = await generateWithAnthropic(
-            `Based on your general knowledge, answer the user query in concise and human-readable format. 
-            Do not specifically mention the knowledge base in your response 
-            User Query: ${queryResponse}`
-          );
+          if (useClaude) {
+            response = await generateWithAnthropic(
+              `Based on your general knowledge, answer the user query in concise and human-readable format. 
+              Do not specifically mention the knowledge base in your response 
+              User Query: ${queryResponse}`
+            );
+          } else {
+            response = await generateWithGoogle(
+              `Based on your general knowledge, answer the user query in concise and human-readable format. 
+                Do not specifically mention the knowledge base in your response 
+                User Query: ${queryResponse}`
+            );
+          }
         }
 
         StoreContext(response?.toString() || "", userSession);
@@ -130,6 +141,9 @@ export default function ClaudeChat() {
     }
   };
 
+  const switchProvider = () => {
+    setUseClaude((prev) => !prev);
+  };
   const formatMixedContent = async (response: string): Promise<string[]> => {
     const htmlContent = await marked.parse(response); // Convert Markdown to HTML
     const div = document.createElement("div");
@@ -164,10 +178,9 @@ export default function ClaudeChat() {
       let formData = new FormData();
       if (selectedFile.type === "application/pdf") {
         // Handle PDF files if needed
-        const fd = new FormData()
-        fd.append("pdf", selectedFile)
-        formData.append("file", await PDF(fd))
-
+        const fd = new FormData();
+        fd.append("pdf", selectedFile);
+        formData.append("file", await PDF(fd));
       } else {
         formData.append("file", selectedFile);
       }
@@ -202,7 +215,7 @@ export default function ClaudeChat() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <Header></Header>
+      <Header switchProvider={switchProvider}></Header>
       <div className="flex-grow overflow-y-auto p-4">
         {messages.map((message) => (
           <div
@@ -321,14 +334,18 @@ export default function ClaudeChat() {
           </Button>
           <Button
             onClick={() => {
-              toast.warning(DeleteIndex("context-index"))
+              toast.warning(DeleteIndex("context-index"));
               toast.warning(DeleteIndex("query-index"));
               setMessages([]);
             }}
             disabled={isLoading}
             aria-label="Clear Context"
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "clear context"}
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "clear context"
+            )}
           </Button>
         </div>
         {files && <p className="text-sm">Selected file: {files.name}</p>}

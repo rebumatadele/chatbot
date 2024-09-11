@@ -15,13 +15,17 @@ import { processFile } from "@/utils/preprocess/create-chunk";
 import PDF from "@/utils/preprocess/pdf-parsing"; // Ensure this is imported
 import { generateWithAnthropic } from "@/utils/providers/claude/integrate";
 
-export default function SearchRoom() {
+interface Props {
+  switchClaude: boolean;
+}
+export default function SearchRoom({ switchClaude }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [outputs, setOutputs] = useState<string[]>([]);
   const [query, setQuery] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSearching, setIsSearching] = useState(false); // Added loader for search
+  const [useClaude, setUseClaude] = useState(switchClaude);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -78,13 +82,23 @@ export default function SearchRoom() {
 
       let response;
       if (context) {
-        response = await generateWithAnthropic(
-          `Rewrite the following paragraphs into cohesive human readable ones
-          i want you to return all the paragraphs
-          separate the paragraphs using line breaks
-          remove any markups like *
-          the paragraphs: ${context}`
-        );
+        if (useClaude) {
+          response = await generateWithAnthropic(
+            `Rewrite the following paragraphs into cohesive human readable ones
+            i want you to return all the paragraphs
+            separate the paragraphs using line breaks
+            remove any markups like *
+            the paragraphs: ${context}`
+          );
+        } else {
+          response = await generateWithGoogle(
+            `Rewrite the following paragraphs into cohesive human readable ones
+            i want you to return all the paragraphs
+            separate the paragraphs using line breaks
+            remove any markups like *
+            the paragraphs: ${context}`
+          );
+        }
       }
       if (response == null) {
         toast.warning("Network Error Try Again");
@@ -114,7 +128,7 @@ export default function SearchRoom() {
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto p-4 space-y-4">
-      <div className="text-xl font-bold">Claude AI Search Engine</div>
+        <div className="text-xl font-bold">Claude AI Search Engine</div>
         <div className="space-y-2">
           <Input
             type="file"
