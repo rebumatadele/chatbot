@@ -13,7 +13,7 @@ export default async function PDF(formData: any) {
     }
 
     const fileName = `${uuidv4()}.pdf`;
-    const filePath = path.join(process.cwd(), "/temp", fileName);
+    const filePath = path.join(process.cwd(), "/tmp", fileName);
 
     try {
         // Handle file as a buffer directly
