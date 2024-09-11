@@ -6,39 +6,35 @@ import pdfParser from "pdf-parse";
 
 export default async function PDF(formData: any) {
     const file = formData.get("pdf");
-    console.log("I am here");
 
+    // Check if file is provided
     if (!file) {
         throw new Error("No valid PDF file provided");
     }
 
+    // Generate a unique file name
     const fileName = `${uuidv4()}.pdf`;
-    const filePath = path.join(process.cwd(), "/tmp", fileName);
+    const tempDir = "/tmp";  // For environments like AWS Lambda
+    const filePath = path.join(tempDir, fileName);
 
     try {
-        // Handle file as a buffer directly
-        const buffer = Buffer.from(await file.arrayBuffer());
-
-        // Ensure the temp folder exists
-        fs.mkdirSync(path.dirname(filePath), { recursive: true });
-
-        // Write the file to the temp directory
-        fs.writeFileSync(filePath, buffer);
-
-        // Ensure file exists before reading
-        if (!fs.existsSync(filePath)) {
-            throw new Error(`File not found at ${filePath}`);
+        // Ensure the /tmp directory exists
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
         }
 
+        // Convert file to buffer
+        const buffer = Buffer.from(await file.arrayBuffer());
+
+        // Write the buffer to a file in /tmp
+        fs.writeFileSync(filePath, buffer);
+
+        // Parse the PDF file from the buffer
         const dataBuffer = fs.readFileSync(filePath);
-
-        // Parse the PDF file
-        console.log("File Path", filePath);
         const pdfData = await pdfParser(dataBuffer);
-        console.log("pdf data", pdfData);
-        const text = pdfData.text;
 
-        return text;
+        // Return the parsed text from the PDF
+        return pdfData.text;
     } catch (error) {
         console.error("Error processing PDF:", error);
         throw new Error("Failed to process PDF");
