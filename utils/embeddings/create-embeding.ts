@@ -4,6 +4,8 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 // Initialize LangChain's OpenAI embedding model
 const embeddingModel = new OpenAIEmbeddings({
   openAIApiKey: process.env.OPENAI_API_KEY,
+  model: "text-embedding-3-large",
+
 });
 
 

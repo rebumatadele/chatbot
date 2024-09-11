@@ -89,15 +89,16 @@ export default function ClaudeChat() {
 
         let response;
         if (context) {
-          response = await generateWithGoogle(
+          response = await generateWithAnthropic(
             `Given the context below, answer the user query in concise and human-readable format.
             Do not specifically mention the knowledge base in your response 
             User Query asked : ${queryResponse} 
             answer it based on the Context: ${context}, 
+            if you find no relation between the context and the user query answer based on your knowledge base
             `
           );
         } else {
-          response = await generateWithGoogle(
+          response = await generateWithAnthropic(
             `Based on your general knowledge, answer the user query in concise and human-readable format. 
             Do not specifically mention the knowledge base in your response 
             User Query: ${queryResponse}`
